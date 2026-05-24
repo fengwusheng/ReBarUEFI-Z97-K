@@ -30,5 +30,5 @@
 	HiiLib|MdeModulePkg/Library/UefiHiiLib/UefiHiiLib.inf
 	SortLib|MdeModulePkg/Library/BaseSortLib/BaseSortLib.inf
 	UefiHiiServicesLib|MdeModulePkg/Library/UefiHiiServicesLib/UefiHiiServicesLib.inf
-	PrintLib|MdePkg/Library/BasePrintLibPkg/BasePrintLibPkg.inf
+	PrintLib|MdePkg/Library/BasePrintLib/BasePrintLib.inf
 	#DxeServicesTableLib|MdePkg/Library/DxeServicesTableLib/DxeServicesTableLib.inf

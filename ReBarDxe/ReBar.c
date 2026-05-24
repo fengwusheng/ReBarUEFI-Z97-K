@@ -328,8 +328,9 @@ EFI_STATUS EFIAPI rebarInit(
 	
 	DEBUG((DEBUG_INFO, "ReBarDXE: Boot Option Scanner Loaded.\n"));
 	
-    // 暴力遍历 Boot0000 到 Boot000F 这 16 个潜在的启动项
-    for (bootIndex = 0; bootIndex <= 0x000F; bootIndex++) {
+    reBarState = 0;
+	// 暴力遍历 Boot0000 到 Boot000F 这 16 个潜在的启动项
+    /*for (bootIndex = 0; bootIndex <= 0x000F; bootIndex++) {
 		bootVarName[7] = (CHAR16)((bootIndex < 10) ? (L'0' + bootIndex) : (L'A' + (bootIndex - 10)));
         bufferSize = 0;
         status = gRT->GetVariable(bootVarName, &gEfiGlobalVariableGuid, NULL, &bufferSize, NULL);
@@ -358,7 +359,7 @@ EFI_STATUS EFIAPI rebarInit(
             }
             gBS->FreePool(bootBuffer);
         }
-    }
+    }*/
 	
 	// added
 	//UINT8 Above4G_Enabled = 0;

@@ -316,15 +316,15 @@ EFI_STATUS EFIAPI rebarInit(
     IN EFI_HANDLE imageHandle,
     IN EFI_SYSTEM_TABLE *systemTable)
 {
-    UINTN bufferSize = 1;
-    EFI_STATUS status;
+    //UINTN bufferSize = 1;
+    //EFI_STATUS status;
     //UINT32 attributes;
     //EFI_TIME time;
 
 	// added
-	UINT16 bootIndex;
-    UINT8 *bootBuffer = NULL;
-    CHAR16 bootVarName[] = L"Boot0000";
+	//UINT16 bootIndex;
+    //UINT8 *bootBuffer = NULL;
+    //CHAR16 bootVarName[] = L"Boot0000";
 	
 	DEBUG((DEBUG_INFO, "ReBarDXE: Boot Option Scanner Loaded.\n"));
 	

@@ -29,7 +29,7 @@ SPDX-License-Identifier: MIT
 #define BUILD_YEAR 2023
 
 // a3c5b77a-c88f-4a93-bf1c-4a92a32c65ce
-static GUID reBarStateGuid = { 0xa3c5b77a, 0xc88f, 0x4a93, {0xbf, 0x1c, 0x4a, 0x92, 0xa3, 0x2c, 0x65, 0xce}};
+//static GUID reBarStateGuid = { 0xa3c5b77a, 0xc88f, 0x4a93, {0xbf, 0x1c, 0x4a, 0x92, 0xa3, 0x2c, 0x65, 0xce}};
 
 // 0: disabled
 // >0: maximum BAR size (2^x) set to value. UINT8_MAX for unlimited
@@ -323,14 +323,14 @@ EFI_STATUS EFIAPI rebarInit(
 
 	// added
 	UINT16 bootIndex;
-    CHAR16 bootVarName[9];
     UINT8 *bootBuffer = NULL;
+    CHAR16 bootVarName[] = L"Boot0000";
 	
 	DEBUG((DEBUG_INFO, "ReBarDXE: Boot Option Scanner Loaded.\n"));
 	
     // 暴力遍历 Boot0000 到 Boot000F 这 16 个潜在的启动项
     for (bootIndex = 0; bootIndex <= 0x000F; bootIndex++) {
-        UnicodeSPrint(bootVarName, sizeof(bootVarName), L"Boot%04X", bootIndex);
+		bootVarName[7] = (CHAR16)((bootIndex < 10) ? (L'0' + bootIndex) : (L'A' + (bootIndex - 10)));
         bufferSize = 0;
         status = gRT->GetVariable(bootVarName, &gEfiGlobalVariableGuid, NULL, &bufferSize, NULL);
         if (status == EFI_BUFFER_TOO_SMALL) {

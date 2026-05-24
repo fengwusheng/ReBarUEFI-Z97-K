@@ -17,6 +17,7 @@
   UefiDriverEntryPoint
   UefiBootServicesTableLib
   UefiRuntimeServicesTableLib
+  DxeServicesTableLib
   UefiLib
    
 [Protocols]

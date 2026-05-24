@@ -6,7 +6,7 @@ SPDX-License-Identifier: MIT
 #include <Library/UefiLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiRuntimeServicesTableLib.h>
-#include <Library/DxeServicesTableLib.h>
+// #include <Library/DxeServicesTableLib.h>
 #include <Protocol/PciRootBridgeIo.h>
 #include <IndustryStandard/Pci22.h>
 #include <Library/MemoryAllocationLib.h>
@@ -211,8 +211,8 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
 
 	// added
 	// 【核心注入：在这里做厂商分流！】
-    // 如果全局变量是 32 或者特殊的无限制标志（说明触发了默认安全阀放行）
-    if (reBarState == 32 || reBarState == 0xFF) {
+    // 如果全局变量是 >= 32 或者特殊的无限制标志（说明触发了默认安全阀放行）
+    if (reBarState >= 32) {
         if (vid == 0x10DE) {
             // NVIDIA (V100): 给 32，满足它全映射死命令
             actualReBarState = 32;
@@ -301,66 +301,114 @@ free:
     FreePool(handleBuffer);
 }
 
+// 帮我们在宽字符里找子串的辅助函数
+CHAR16* StrStr16(IN CHAR16* Str, IN CHAR16* Search) {
+    UINTN Len = StrLen(Search);
+    if (Len == 0) return Str;
+    while (*Str) {
+        if (StrnCmp(Str, Search, Len) == 0) return Str;
+        Str++;
+    }
+    return NULL;
+}
+
 EFI_STATUS EFIAPI rebarInit(
     IN EFI_HANDLE imageHandle,
     IN EFI_SYSTEM_TABLE *systemTable)
 {
     UINTN bufferSize = 1;
     EFI_STATUS status;
-    UINT32 attributes;
-    EFI_TIME time;
+    //UINT32 attributes;
+    //EFI_TIME time;
 
 	// added
-	UINT8 Above4G_Enabled = 0;
-	UINTN NumberOfDescriptors = 0;
-	EFI_GCD_MEMORY_SPACE_DESCRIPTOR *MemorySpaceMap = NULL;
+	UINT16 bootIndex;
+    CHAR16 bootVarName[9];
+    UINT8 *bootBuffer = NULL;
+	
+	DEBUG((DEBUG_INFO, "ReBarDXE: Boot Option Scanner Loaded.\n"));
+	
+    // 暴力遍历 Boot0000 到 Boot000F 这 16 个潜在的启动项
+    for (bootIndex = 0; bootIndex <= 0x000F; bootIndex++) {
+        UnicodeSPrint(bootVarName, sizeof(bootVarName), L"Boot%04X", bootIndex);
+        bufferSize = 0;
+        status = gRT->GetVariable(bootVarName, &gEfiGlobalVariableGuid, NULL, &bufferSize, NULL);
+        if (status == EFI_BUFFER_TOO_SMALL) {
+            // 开辟内存读取整个启动项结构
+            gBS->AllocatePool(EfiBootServicesData, bufferSize, (VOID**)&bootBuffer);
+            status = gRT->GetVariable(bootVarName, &gEfiGlobalVariableGuid, NULL, &bufferSize, bootBuffer);
+            if (status == EFI_SUCCESS) {
+                // EFI_LOAD_OPTION 结构：
+                // Attributes (4 字节) + FilePathListLength (2 字节)
+                // 紧接着就是以 NULL 结尾的 Description 字符串（宽字符）
+                CHAR16 *description = (CHAR16*)(bootBuffer + 6);
+                
+                // 寻找黄金关键字 L"ReBarState="
+                CHAR16 *match = StrStr16(description, L"ReBarState=");
+                if (match != NULL) {
+                    CHAR16 *valueStr = match + 11; // 跳过 "ReBarState=" 这 11 个字符
+                    UINTN parsedValue = StrDecimalToUintn(valueStr);
+                    if (parsedValue <= 32) {
+                        reBarState = (UINT8)parsedValue;
+                        DEBUG((DEBUG_INFO, "ReBarDXE: Hijacked from %s! Found ReBarState=%u\n", bootVarName, reBarState));
+                        gBS->FreePool(bootBuffer);
+                        break; // 找到了就立刻收工，以此项为准！
+                    }
+                }
+            }
+            gBS->FreePool(bootBuffer);
+        }
+    }
+	
+	// added
+	//UINT8 Above4G_Enabled = 0;
+	//UINTN NumberOfDescriptors = 0;
+	//EFI_GCD_MEMORY_SPACE_DESCRIPTOR *MemorySpaceMap = NULL;
 
-    DEBUG((DEBUG_INFO, "ReBarDXE: Loaded\n"));
+    //DEBUG((DEBUG_INFO, "ReBarDXE: Loaded\n"));
 
     // Read ReBarState variable
-    status = gRT->GetVariable(L"ReBarState", &reBarStateGuid,
-        &attributes,
-        &bufferSize, &reBarState);
+    //status = gRT->GetVariable(L"ReBarState", &reBarStateGuid,
+    //    &attributes,
+    //    &bufferSize, &reBarState);
 
     // any attempts to overflow reBarState should result in EFI_BUFFER_TOO_SMALL
-    if (status != EFI_SUCCESS)
-	{
-		// added
-		// 1. 动态获取当前主板开机自检后，分配出来的全部硬件内存空间描述符
-		status = gDS->GetMemorySpaceMap(&NumberOfDescriptors, &MemorySpaceMap);
-		if (status == EFI_SUCCESS) {
-    		for (UINTN i = 0; i < NumberOfDescriptors; i++) {
-        		// 2. 物理扫描：如果发现主板已经把 PCIe MMIO 资源（非系统主内存）开辟到了 4GB 以上的空间
-        		if (MemorySpaceMap[i].GcdMemoryType == EfiGcdMemoryTypeMemoryMappedIo &&
-            		MemorySpaceMap[i].BaseAddress >= 0x100000000ULL) { 
-            
-            		// 3. 证明主板此时硬件上已经绝对支持并开启了大窗口，安全阀直接解锁！
-            		Above4G_Enabled = 1;
-            		break;
-        		}
-    		}
-    		gBS->FreePool(MemorySpaceMap);
-		}
-		reBarState = !Above4G_Enabled ? 0 : 32; // 后续 reBarSetupDevice 再分流
-	}
+    //if (status != EFI_SUCCESS)
+	//{
+	//	// added
+	//	// 1. 动态获取当前主板开机自检后，分配出来的全部硬件内存空间描述符
+	//	status = gDS->GetMemorySpaceMap(&NumberOfDescriptors, &MemorySpaceMap);
+	//	if (status == EFI_SUCCESS) {
+    //		for (UINTN i = 0; i < NumberOfDescriptors; i++) {
+    //    		// 2. 物理扫描：如果发现主板已经把 PCIe MMIO 资源（非系统主内存）开辟到了 4GB 以上的空间
+    //    		if (MemorySpaceMap[i].GcdMemoryType == EfiGcdMemoryTypeMemoryMappedIo &&
+    //        		MemorySpaceMap[i].BaseAddress >= 0x100000000ULL) { 
+    //        
+    //        		// 3. 证明主板此时硬件上已经绝对支持并开启了大窗口，安全阀直接解锁！
+    //        		Above4G_Enabled = 1;
+    //        		break;
+    //    		}
+    //		}
+    //		gBS->FreePool(MemorySpaceMap);
+	//	}
+	//	reBarState = !Above4G_Enabled ? 0 : 32; // 后续 reBarSetupDevice 再分流
+	//}
 
     if (reBarState)
     {
         DEBUG((DEBUG_INFO, "ReBarDXE: Enabled, maximum BAR size 2^%u MB\n", reBarState));
 
         // Detect CMOS reset by checking if year before BUILD_YEAR
-        status = gRT->GetTime (&time, NULL);
-        if (time.Year < BUILD_YEAR) {
-            reBarState = 0;
-            bufferSize = 1;
-            attributes = EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS;
-
-            status = gRT->SetVariable(L"ReBarState", &reBarStateGuid,
-                attributes,
-                bufferSize, &reBarState);
-
-            return EFI_SUCCESS;
-        }
+        //status = gRT->GetTime (&time, NULL);
+        //if (time.Year < BUILD_YEAR) {
+        //    reBarState = 0;
+        //    bufferSize = 1;
+        //    attributes = EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS;
+        //    status = gRT->SetVariable(L"ReBarState", &reBarStateGuid,
+        //        attributes,
+        //        bufferSize, &reBarState);
+        //    return EFI_SUCCESS;
+        //}
 
         // For overriding PciHostBridgeResourceAllocationProtocol
         pciHostBridgeResourceAllocationProtocolHook();

@@ -17,8 +17,9 @@
   UefiDriverEntryPoint
   UefiBootServicesTableLib
   UefiRuntimeServicesTableLib
-  DxeServicesTableLib
   UefiLib
+  PrintLib
+  #DxeServicesTableLib
    
 [Protocols]
   gEfiPciRootBridgeIoProtocolGuid ## SOMETIMES_CONSUMES

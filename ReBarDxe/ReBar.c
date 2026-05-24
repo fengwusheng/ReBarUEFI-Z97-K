@@ -6,6 +6,7 @@ SPDX-License-Identifier: MIT
 #include <Library/UefiLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiRuntimeServicesTableLib.h>
+#include <Library/DxeServicesTableLib.h>
 #include <Protocol/PciRootBridgeIo.h>
 #include <IndustryStandard/Pci22.h>
 #include <Library/MemoryAllocationLib.h>
@@ -194,6 +195,9 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
     UINT16 vid, did;
     UINTN pciAddress;
 
+	// added
+	UINT8 actualReBarState = reBarState; // 引入一个局部变量承接全局状态
+
     gBS->HandleProtocol(handle, &gEfiPciRootBridgeIoProtocolGuid, (void **)&pciRootBridgeIo);
 
     pciAddress = EFI_PCI_ADDRESS(addrInfo.Bus, addrInfo.Device, addrInfo.Function, 0);
@@ -205,6 +209,21 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
 
     DEBUG((DEBUG_INFO, "ReBarDXE: Device vid:%x did:%x\n", vid, did));
 
+	// added
+	// 【核心注入：在这里做厂商分流！】
+    // 如果全局变量是 32 或者特殊的无限制标志（说明触发了默认安全阀放行）
+    if (reBarState == 32 || reBarState == UINT8_MAX) {
+        if (vid == 0x10DE) {
+            // NVIDIA (V100): 给 32，满足它全映射死命令
+            actualReBarState = 32;
+        } else if (vid == 0x1002) {
+            // AMD (6600XT): 主动让路，只给 1GB (10) 或者是 512MB (9)，不撑爆主板
+            actualReBarState = 10; 
+        } else {
+            actualReBarState = 0;
+        }
+    }
+	
     epos = pciFindExtCapability(pciAddress, PCI_EXT_CAP_ID_REBAR);
     if (epos)
     {
@@ -214,7 +233,7 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
             if (!rBarS)
                 continue;
             // start with size from fls
-            for (UINT8 n = MIN((UINT8)fls(rBarS), reBarState); n > 0; n--) {
+            for (UINT8 n = MIN((UINT8)fls(rBarS), actualReBarState); n > 0; n--) { // added reBarState -> actualReBarState
                 // check if size is supported
                 if (rBarS & (1 << n)) {
                     pciRebarSetSize(pciAddress, epos, bar, n);
@@ -291,6 +310,11 @@ EFI_STATUS EFIAPI rebarInit(
     UINT32 attributes;
     EFI_TIME time;
 
+	// added
+	UINT8 Above4G_Enabled = 0;
+	UINTN NumberOfDescriptors = 0;
+	EFI_GCD_MEMORY_SPACE_DESCRIPTOR *MemorySpaceMap = NULL;
+
     DEBUG((DEBUG_INFO, "ReBarDXE: Loaded\n"));
 
     // Read ReBarState variable
@@ -300,7 +324,25 @@ EFI_STATUS EFIAPI rebarInit(
 
     // any attempts to overflow reBarState should result in EFI_BUFFER_TOO_SMALL
     if (status != EFI_SUCCESS)
-        reBarState = 0;
+	{
+		// added
+		// 1. 动态获取当前主板开机自检后，分配出来的全部硬件内存空间描述符
+		status = gDS->GetMemorySpaceMap(&NumberOfDescriptors, &MemorySpaceMap);
+		if (status == EFI_SUCCESS) {
+    		for (UINTN i = 0; i < NumberOfDescriptors; i++) {
+        		// 2. 物理扫描：如果发现主板已经把 PCIe MMIO 资源（非系统主内存）开辟到了 4GB 以上的空间
+        		if (MemorySpaceMap[i].GcdMemoryType == EfiGcdMemoryTypeMemoryMappedIo &&
+            		MemorySpaceMap[i].BaseAddress >= 0x100000000ULL) { 
+            
+            		// 3. 证明主板此时硬件上已经绝对支持并开启了大窗口，安全阀直接解锁！
+            		Above4G_Enabled = 1;
+            		break;
+        		}
+    		}
+    		gBS->FreePool(MemorySpaceMap);
+		}
+		reBarState = !Above4G_Enabled ? 0 : 32; // 后续 reBarSetupDevice 再分流
+	}
 
     if (reBarState)
     {

@@ -212,7 +212,7 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
 	// added
 	// 【核心注入：在这里做厂商分流！】
     // 如果全局变量是 32 或者特殊的无限制标志（说明触发了默认安全阀放行）
-    if (reBarState == 32 || reBarState == UINT8_MAX) {
+    if (reBarState == 32 || reBarState == 0xFF) {
         if (vid == 0x10DE) {
             // NVIDIA (V100): 给 32，满足它全映射死命令
             actualReBarState = 32;

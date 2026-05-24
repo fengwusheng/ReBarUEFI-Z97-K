@@ -5,6 +5,7 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+  workflow_dispatch:
 env:
   TARGET: RELEASE
   TARGET_ARCH: X64

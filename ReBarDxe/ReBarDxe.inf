@@ -18,7 +18,6 @@
   UefiBootServicesTableLib
   UefiRuntimeServicesTableLib
   UefiLib
-  PrintLib
   #DxeServicesTableLib
    
 [Protocols]

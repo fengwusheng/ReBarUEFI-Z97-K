@@ -211,18 +211,17 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
 
 	// added
 	// 【核心注入：在这里做厂商分流！】
-    // 如果全局变量是 >= 32 或者特殊的无限制标志（说明触发了默认安全阀放行）
-    if (reBarState >= 32) {
-        if (vid == 0x10DE) {
-            // NVIDIA (V100): 给 32，满足它全映射死命令
-            actualReBarState = 32;
-        } else if (vid == 0x1002) {
-            // AMD (6600XT): 主动让路，只给 1GB (10) 或者是 512MB (9)，不撑爆主板
-            actualReBarState = 10; 
-        } else {
-            actualReBarState = 0;
-        }
+    if (vid == 0x10DE) {
+        // NVIDIA (V100): 可以给 32，满足它全映射死命令
+        actualReBarState = reBarState >= 32 ? 32 : reBarState;
+    } else if (vid == 0x1002) {
+        // AMD (6600XT): 主动让路，只给 1GB (10) 或者是 512MB (9)，不撑爆主板
+        actualReBarState = reBarState >= 10 ? 10 : reBarState; 
+    } else {
+		// 其他不允许ReBar
+        actualReBarState = 0;
     }
+
 	
     epos = pciFindExtCapability(pciAddress, PCI_EXT_CAP_ID_REBAR);
     if (epos)

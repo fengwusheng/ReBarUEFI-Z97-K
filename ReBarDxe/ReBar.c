@@ -211,7 +211,9 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
 	// 【核心注入：在这里做厂商分流！】
     if (vid == 0x10DE) {
         // NVIDIA (V100): 可以给 32，满足它全映射死命令
-        actualReBarState = reBarState >= 32 ? 32 : reBarState;
+        //actualReBarState = reBarState >= 32 ? 32 : reBarState;
+		// N卡走 魔改 DSDT 路线，初始只开 512MB 够用
+        actualReBarState = reBarState >= 9 ? 9 : reBarState;
     } else if (vid == 0x1002) {
         // AMD (6600XT): 主动让路，只给 1GB (10) 或者是 512MB (9)，不撑爆主板
         actualReBarState = reBarState >= 10 ? 10 : reBarState; 
@@ -330,7 +332,7 @@ EFI_STATUS EFIAPI rebarInit(
         gBS->AllocatePool(EfiBootServicesData, bufferSize, (VOID**)&setupBuffer);
         status = gRT->GetVariable(L"Setup", &mSetupGuid, NULL, &bufferSize, setupBuffer);
         if (status == EFI_SUCCESS) {
-			reBarState = bufferSize > 16 && setupBuffer[0x01] > 0 ? 10 : reBarState; // ASUS Z97-K R2.0 的 Above 4G Decoding 是 0x1 即使不是，设置 10 问题也不大。
+			reBarState = bufferSize > 16 && setupBuffer[0x01] > 0 ? 10 : reBarState; // ASUS Z97-K R2.0 的 Above 4G Decoding 是 0x1 即使不是，设置 10 即 1GB 问题也不大。
         }
         gBS->FreePool(setupBuffer);
     }

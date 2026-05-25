@@ -195,9 +195,6 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
     UINT16 vid, did;
     UINTN pciAddress;
 
-	// added
-	UINT8 actualReBarState = reBarState; // 引入一个局部变量承接全局状态
-
     gBS->HandleProtocol(handle, &gEfiPciRootBridgeIoProtocolGuid, (void **)&pciRootBridgeIo);
 
     pciAddress = EFI_PCI_ADDRESS(addrInfo.Bus, addrInfo.Device, addrInfo.Function, 0);
@@ -210,6 +207,7 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
     DEBUG((DEBUG_INFO, "ReBarDXE: Device vid:%x did:%x\n", vid, did));
 
 	// added
+	UINT8 actualReBarState = reBarState; // 引入一个局部变量承接全局状态
 	// 【核心注入：在这里做厂商分流！】
     if (vid == 0x10DE) {
         // NVIDIA (V100): 可以给 32，满足它全映射死命令
@@ -221,7 +219,6 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
 		// 其他不允许ReBar
         actualReBarState = 0;
     }
-
 	
     epos = pciFindExtCapability(pciAddress, PCI_EXT_CAP_ID_REBAR);
     if (epos)
@@ -315,19 +312,32 @@ EFI_STATUS EFIAPI rebarInit(
     IN EFI_HANDLE imageHandle,
     IN EFI_SYSTEM_TABLE *systemTable)
 {
-    UINTN bufferSize = 1;
+    UINTN bufferSize = 0;
     EFI_STATUS status;
-    //UINT32 attributes;
-    //EFI_TIME time;
-
-	// added
-	UINT16 bootIndex;
-    UINT8 *bootBuffer = NULL;
-    CHAR16 bootVarName[] = L"Boot0000";
 	
 	DEBUG((DEBUG_INFO, "ReBarDXE: Boot Option Scanner Loaded.\n"));
 
 	reBarState = 0;
+
+	// added
+	UINT8 *setupBuffer = NULL;
+	EFI_GUID mSetupGuid = { 0xEC87D643, 0xEBA4, 0x4BB5, { 0xA1, 0xE5, 0x3F, 0x3E, 0x36, 0xB2, 0x0D, 0xA9 } };
+	// 第一步：先试探性读取，拿到 Setup 结构体的总物理大小（公摊面积）
+    status = gRT->GetVariable(L"Setup", &mSetupGuid, NULL, &bufferSize, NULL);
+    if (status == EFI_BUFFER_TOO_SMALL) {
+        // 第二步：动态开辟内存，准备把整个 Setup 结构体打包拉出来
+        gBS->AllocatePool(EfiBootServicesData, bufferSize, (VOID**)&setupBuffer);
+        status = gRT->GetVariable(L"Setup", &mSetupGuid, NULL, &bufferSize, setupBuffer);
+        if (status == EFI_SUCCESS) {
+			reBarState = bufferSize > 16 && setupBuffer[0x01] > 0 ? 10 : reBarState; // ASUS Z97-K R2.0 的 Above 4G Decoding 是 0x1 即使不是，设置 10 问题也不大。
+        }
+        gBS->FreePool(setupBuffer);
+    }
+	
+	// added
+	UINT16 bootIndex;
+    UINT8 *bootBuffer = NULL;
+    CHAR16 bootVarName[] = L"Boot0000";
     // 暴力遍历 Boot0000 到 Boot000F 这 16 个潜在的启动项
     for (bootIndex = 0; bootIndex <= 0x000F; bootIndex++) {
 		bootVarName[7] = (CHAR16)((bootIndex < 10) ? (L'0' + bootIndex) : (L'A' + (bootIndex - 10)));
@@ -360,14 +370,12 @@ EFI_STATUS EFIAPI rebarInit(
         }
     }
 	
-	// added
-	//UINT8 Above4G_Enabled = 0;
-	//UINTN NumberOfDescriptors = 0;
-	//EFI_GCD_MEMORY_SPACE_DESCRIPTOR *MemorySpaceMap = NULL;
-
     //DEBUG((DEBUG_INFO, "ReBarDXE: Loaded\n"));
 
     // Read ReBarState variable
+    //UINT32 attributes;
+    //EFI_TIME time;
+	//bufferSize = 1;
     //status = gRT->GetVariable(L"ReBarState", &reBarStateGuid,
     //    &attributes,
     //    &bufferSize, &reBarState);
@@ -376,6 +384,9 @@ EFI_STATUS EFIAPI rebarInit(
     //if (status != EFI_SUCCESS)
 	//{
 	//	// added
+	//	UINT8 Above4G_Enabled = 0;
+	//	UINTN NumberOfDescriptors = 0;
+	//	EFI_GCD_MEMORY_SPACE_DESCRIPTOR *MemorySpaceMap = NULL;
 	//	// 1. 动态获取当前主板开机自检后，分配出来的全部硬件内存空间描述符
 	//	status = gDS->GetMemorySpaceMap(&NumberOfDescriptors, &MemorySpaceMap);
 	//	if (status == EFI_SUCCESS) {

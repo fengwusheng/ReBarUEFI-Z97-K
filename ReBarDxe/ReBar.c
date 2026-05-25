@@ -316,22 +316,21 @@ EFI_STATUS EFIAPI rebarInit(
     IN EFI_HANDLE imageHandle,
     IN EFI_SYSTEM_TABLE *systemTable)
 {
-    //UINTN bufferSize = 1;
-    //EFI_STATUS status;
+    UINTN bufferSize = 1;
+    EFI_STATUS status;
     //UINT32 attributes;
     //EFI_TIME time;
 
 	// added
-	//UINT16 bootIndex;
-    //UINT8 *bootBuffer = NULL;
-    //CHAR16 bootVarName[] = L"Boot0000";
+	UINT16 bootIndex;
+    UINT8 *bootBuffer = NULL;
+    CHAR16 bootVarName[] = L"Boot0000";
 	
 	DEBUG((DEBUG_INFO, "ReBarDXE: Boot Option Scanner Loaded.\n"));
-	
-    reBarState = 0;
-	if (imageHandle == NULL && gRT == NULL) reBarState = 10;
-	// 暴力遍历 Boot0000 到 Boot000F 这 16 个潜在的启动项
-    /*for (bootIndex = 0; bootIndex <= 0x000F; bootIndex++) {
+
+	reBarState = 0;
+    // 暴力遍历 Boot0000 到 Boot000F 这 16 个潜在的启动项
+    for (bootIndex = 0; bootIndex <= 0x000F; bootIndex++) {
 		bootVarName[7] = (CHAR16)((bootIndex < 10) ? (L'0' + bootIndex) : (L'A' + (bootIndex - 10)));
         bufferSize = 0;
         status = gRT->GetVariable(bootVarName, &gEfiGlobalVariableGuid, NULL, &bufferSize, NULL);
@@ -360,7 +359,7 @@ EFI_STATUS EFIAPI rebarInit(
             }
             gBS->FreePool(bootBuffer);
         }
-    }*/
+    }
 	
 	// added
 	//UINT8 Above4G_Enabled = 0;

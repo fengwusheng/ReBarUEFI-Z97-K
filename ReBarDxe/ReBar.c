@@ -212,8 +212,8 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
     if (vid == 0x10DE) {
         // NVIDIA (V100): 可以给 32，满足它全映射死命令
         //actualReBarState = reBarState >= 32 ? 32 : reBarState;
-		// N卡走 魔改 DSDT 路线，初始只开 512MB 够用
-        actualReBarState = reBarState >= 9 ? 9 : reBarState;
+		// N卡走 魔改 DSDT 路线，初始只开 512MB 够用 或 开始不开都没问题，N卡后面 DSDT 很宽松
+        actualReBarState = 0; // 直接不管就好 reBarState == 9 ? 9 : 0 不用给 512 MB的
     } else if (vid == 0x1002) {
         // AMD (6600XT): 主动让路，只给 1GB (10) 或者是 512MB (9)，不撑爆主板
         actualReBarState = reBarState >= 10 ? 10 : reBarState; 

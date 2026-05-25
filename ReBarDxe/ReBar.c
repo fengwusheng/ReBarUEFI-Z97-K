@@ -323,6 +323,7 @@ EFI_STATUS EFIAPI rebarInit(
 	UINT8 *setupBuffer = NULL;
 	EFI_GUID mSetupGuid = { 0xEC87D643, 0xEBA4, 0x4BB5, { 0xA1, 0xE5, 0x3F, 0x3E, 0x36, 0xB2, 0x0D, 0xA9 } };
 	// 第一步：先试探性读取，拿到 Setup 结构体的总物理大小（公摊面积）
+	bufferSize = 0;
     status = gRT->GetVariable(L"Setup", &mSetupGuid, NULL, &bufferSize, NULL);
     if (status == EFI_BUFFER_TOO_SMALL) {
         // 第二步：动态开辟内存，准备把整个 Setup 结构体打包拉出来

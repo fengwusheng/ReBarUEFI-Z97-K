@@ -66,9 +66,7 @@ BOOLEAN IsCtrlKeyPressed() {
     if (EFI_ERROR(Status) || TxtInEx == NULL) return FALSE; // 获取协议失败，保守起见返回 FALSE
 
 	// 在循环开始前，往屏幕上打印提示词
-	if (gST->ConOut != NULL && !isChecked) {
-	    gST->ConOut->OutputString (gST->ConOut, L"Press Ctrl key to skip ReBar ...\r\n");
-	}
+	//if (gST->ConOut != NULL && !isChecked) gST->ConOut->OutputString (gST->ConOut, L"Press Ctrl key to skip ReBar ...\r\n");
     // 2. 读取当前的键盘状态（KeyState），6000ms 黄金窗口蹲守
 	for (UINTN msWait = 10, RetryCount = isChecked ? 1 : (6000 / msWait), ReadyCount = 0; RetryCount > 0 && ReadyCount < (2000 / msWait); RetryCount--) {
 		Status = TxtInEx->ReadKeyStrokeEx (TxtInEx, &KeyData);
@@ -78,9 +76,7 @@ BOOLEAN IsCtrlKeyPressed() {
 			if ((KeyData.KeyState.KeyShiftState & 0x80000000) != 0) { // EFI_SHIFT_STATE_VALID 0x80000000
                 if ((KeyData.KeyState.KeyShiftState & (0x00000001 | 0x00000002)) != 0) { // EFI_LEFT_CONTROL_PRESSED 0x00000001   EFI_RIGHT_CONTROL_PRESSED 0x00000002
                     isPressed = TRUE;
-                    if (gST->ConOut != NULL) {
-						gST->ConOut->OutputString (gST->ConOut, L"[-] Ctrl pressed! ReBar skipped ...\r\n");
-					}
+                    //if (gST->ConOut != NULL)  gST->ConOut->OutputString (gST->ConOut, L"[-] Ctrl pressed! ReBar skipped ...\r\n");
 					break;
                 }
             }
@@ -303,18 +299,6 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
                 // check if size is supported
                 if (rBarS & (1 << n)) {
                     pciRebarSetSize(pciAddress, epos, bar, n);
-					if (gST->ConOut != NULL) {
-						CHAR16 HexChars[] = L"0123456789ABCDEF";
-						CHAR16 VidWStr[5]; VidWStr[0] = HexChars[(vid >> 12) & 0xF]; VidWStr[1] = HexChars[(vid >> 8) & 0xF]; VidWStr[2] = HexChars[(vid >> 4) & 0xF]; VidWStr[3] = HexChars[(vid) & 0xF]; VidWStr[4] = L'\0';
-						CHAR16 ValWStr[3]; ValWStr[0] = L'0' + (n / 10); ValWStr[1] = L'0' + (n % 10); ValWStr[2] = L'\0';
-						gST->ConOut->OutputString (gST->ConOut, L"GPU VID: 0x");
-						gST->ConOut->OutputString (gST->ConOut, VidWStr);
-						gST->ConOut->OutputString (gST->ConOut, L" | ReBarState=");
-						gST->ConOut->OutputString (gST->ConOut, n >= 10 ? ValWStr : ValWStr + 1);
-						gST->ConOut->OutputString (gST->ConOut, L"  (2^");
-						gST->ConOut->OutputString (gST->ConOut, n >= 10 ? ValWStr : ValWStr + 1);
-						gST->ConOut->OutputString (gST->ConOut, L"MB)\r\n");
-					}
                     break;
                 }
             }

@@ -310,9 +310,9 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
 						gST->ConOut->OutputString (gST->ConOut, L"GPU VID: 0x");
 						gST->ConOut->OutputString (gST->ConOut, VidWStr);
 						gST->ConOut->OutputString (gST->ConOut, L" | ReBarState=");
-						gST->ConOut->OutputString (gST->ConOut, Value >= 10 ? ValWStr : ValWStr + 1);
+						gST->ConOut->OutputString (gST->ConOut, n >= 10 ? ValWStr : ValWStr + 1);
 						gST->ConOut->OutputString (gST->ConOut, L"  (2^");
-						gST->ConOut->OutputString (gST->ConOut, Value >= 10 ? ValWStr : ValWStr + 1);
+						gST->ConOut->OutputString (gST->ConOut, n >= 10 ? ValWStr : ValWStr + 1);
 						gST->ConOut->OutputString (gST->ConOut, L"MB)\r\n");
 					}
                     break;

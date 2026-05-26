@@ -6,6 +6,7 @@ SPDX-License-Identifier: MIT
 #include <Library/UefiLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiRuntimeServicesTableLib.h>
+#include <Protocol/SimpleTextInEx.h>
 // #include <Library/DxeServicesTableLib.h>
 #include <Protocol/PciRootBridgeIo.h>
 #include <IndustryStandard/Pci22.h>
@@ -39,6 +40,53 @@ static EFI_PCI_HOST_BRIDGE_RESOURCE_ALLOCATION_PROTOCOL *pciResAlloc;
 static EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *pciRootBridgeIo;
 
 static EFI_PCI_HOST_BRIDGE_RESOURCE_ALLOCATION_PROTOCOL_PREPROCESS_CONTROLLER o_PreprocessController;
+
+
+// 检测 Ctrl 键是否被按下
+BOOLEAN IsCtrlKeyPressed() {
+    EFI_STATUS Status;
+    EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *TxtInEx = NULL;
+    EFI_KEY_STATE KeyState;
+
+    // 1. 通过 BootServices 获取系统的扩展输入协议
+    Status = gBS->LocateProtocol(
+        &gEfiSimpleTextInputExProtocolGuid, 
+        NULL, 
+        (VOID **)&TxtInEx
+    );
+
+    if (EFI_ERROR(Status) || TxtInEx == NULL) {
+        return FALSE; // 获取协议失败，保守起见返回 FALSE
+    }
+
+    // 2. 读取当前的键盘状态（KeyState）
+    // 注意：部分老主板可能需要调用 ReadKeyStrokeEx 刷新缓冲区，
+    // 但直接读取控制键状态通常可以通过协议的 KeyState 属性或相关接口
+    Status = TxtInEx->GetState(TxtInEx, &KeyState);
+    if (EFI_ERROR(Status)) {
+        return FALSE;
+    }
+
+    // 3. 判定判定：检测虚拟控制键状态
+    // EFI_CTRL_PRESSED_VALUE 包括左 Ctrl 或右 Ctrl
+    if ((KeyState.KeyShiftState & EFI_CTRL_PRESSED_VALUE) != 0) {
+        return TRUE; // Ctrl 确实被按着！
+    }
+
+    return FALSE;
+}
+
+// 帮我们在宽字符里找子串的辅助函数
+CHAR16* StrStr16(IN CHAR16* Str, IN CHAR16* Search) {
+    UINTN Len = StrLen(Search);
+    if (Len == 0) return Str;
+    while (*Str) {
+        if (StrnCmp(Str, Search, Len) == 0) return Str;
+        Str++;
+    }
+    return NULL;
+}
+
 
 // find last set bit and return the index of it
 INTN fls(UINT32 x)
@@ -204,6 +252,9 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
     if (vid == 0xFFFF)
         return;
 
+	// added
+	if (IsCtrlKeyPressed()) return;
+
     DEBUG((DEBUG_INFO, "ReBarDXE: Device vid:%x did:%x\n", vid, did));
 
 	// added
@@ -301,16 +352,6 @@ free:
     FreePool(handleBuffer);
 }
 
-// 帮我们在宽字符里找子串的辅助函数
-CHAR16* StrStr16(IN CHAR16* Str, IN CHAR16* Search) {
-    UINTN Len = StrLen(Search);
-    if (Len == 0) return Str;
-    while (*Str) {
-        if (StrnCmp(Str, Search, Len) == 0) return Str;
-        Str++;
-    }
-    return NULL;
-}
 
 EFI_STATUS EFIAPI rebarInit(
     IN EFI_HANDLE imageHandle,
@@ -321,7 +362,9 @@ EFI_STATUS EFIAPI rebarInit(
 	
 	DEBUG((DEBUG_INFO, "ReBarDXE: Boot Option Scanner Loaded.\n"));
 
+	// added
 	reBarState = 0;
+	if (IsCtrlKeyPressed()) return EFI_SUCCESS;
 
 	CHAR8 StrConfig[] = "ReBar_CFG:Above4GDecodingOffset=0x0001|SetupReBarStateOffset=0xFFFF|EnableUEFIBootMenuDetectReBarState=1|EnableDefaultReBarState=0";
 	UINT32 Above4GOffset   = (UINT32)AsciiStrHexToUintn(&StrConfig[32]);

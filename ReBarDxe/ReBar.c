@@ -67,7 +67,7 @@ BOOLEAN IsCtrlKeyPressed() {
 
 	// 在循环开始前，往屏幕上打印提示词
 	if (gST->ConOut != NULL && !isChecked) {
-	    gST->ConOut->OutputString (gST->ConOut, L"Press Ctrl key to skip ReBar...\r\n");
+	    gST->ConOut->OutputString (gST->ConOut, L"Press Ctrl key to skip ReBar ...\r\n");
 	}
     // 2. 读取当前的键盘状态（KeyState），6000ms 黄金窗口蹲守
 	for (UINTN msWait = 10, RetryCount = isChecked ? 1 : (6000 / msWait), ReadyCount = 0; RetryCount > 0 && ReadyCount < (2000 / msWait); RetryCount--) {
@@ -77,8 +77,11 @@ BOOLEAN IsCtrlKeyPressed() {
 			// 3. 判定判定：检测虚拟控制键状态，包括左 Ctrl 或右 Ctrl
 			if ((KeyData.KeyState.KeyShiftState & 0x80000000) != 0) { // EFI_SHIFT_STATE_VALID 0x80000000
                 if ((KeyData.KeyState.KeyShiftState & (0x00000001 | 0x00000002)) != 0) { // EFI_LEFT_CONTROL_PRESSED 0x00000001   EFI_RIGHT_CONTROL_PRESSED 0x00000002
-                    isPressed = TRUE; 
-                    break;
+                    isPressed = TRUE;
+                    if (gST->ConOut != NULL) {
+						gST->ConOut->OutputString (gST->ConOut, L"[-] Ctrl pressed! ReBar skipped ...\r\n");
+					}
+					break;
                 }
             }
 		}

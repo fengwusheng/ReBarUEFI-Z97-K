@@ -62,18 +62,11 @@ BOOLEAN IsCtrlKeyPressed() {
 	}
 	
 	// 1. 通过 BootServices 获取系统的扩展输入协议
-    Status = gBS->LocateProtocol(
-        &gEfiSimpleTextInputExProtocolGuid, 
-        NULL, 
-        (VOID **)&TxtInEx
-    );
-
-    if (EFI_ERROR(Status) || TxtInEx == NULL) {
-        return FALSE; // 获取协议失败，保守起见返回 FALSE
-    }
+    Status = gBS->LocateProtocol(&gEfiSimpleTextInputExProtocolGuid, NULL,  (VOID **)&TxtInEx);
+    if (EFI_ERROR(Status) || TxtInEx == NULL) return FALSE; // 获取协议失败，保守起见返回 FALSE
 
     // 2. 读取当前的键盘状态（KeyState），6000ms 黄金窗口蹲守
-	for (UINTN RetryCount = isChecked ? 1 : 60, ReadyCount = 0; RetryCount > 0 && ReadyCount < 10; RetryCount--) {
+	for (UINTN msWait = 5, RetryCount = isChecked ? 1 : (6000 / msWait), ReadyCount = 0; RetryCount > 0 && ReadyCount < (2000 / msWait); RetryCount--) {
 		Status = TxtInEx->ReadKeyStrokeEx (TxtInEx, &KeyData);
 		if (Status == EFI_SUCCESS) ReadyCount++;
 		if (Status == EFI_SUCCESS || Status == EFI_NOT_READY) {
@@ -85,7 +78,7 @@ BOOLEAN IsCtrlKeyPressed() {
                 }
             }
 		}
-		if (RetryCount > 1) gBS->Stall (100000); // 每次等 100 毫秒（最后一次不用等）
+		gBS->Stall (msWait * 1000); // 每次等 5 毫秒
 	}
 
 	isChecked = TRUE;

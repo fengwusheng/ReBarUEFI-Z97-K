@@ -52,7 +52,7 @@ BOOLEAN IsCtrlKeyPressed() {
 	
     EFI_STATUS Status;
     EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *TxtInEx = NULL;
-    EFI_KEY_STATE KeyState;
+    EFI_KEY_DATA KeyData;
 	UINTN RetryCount = isChecked ? 1 : 50;
 
 	// 前置防御：在检测前，强行刷新重置标准输入流
@@ -73,11 +73,8 @@ BOOLEAN IsCtrlKeyPressed() {
         return FALSE; // 获取协议失败，保守起见返回 FALSE
     }
 
-    // 2. 读取当前的键盘状态（KeyState）
-	// 500ms 黄金窗口蹲守
+    // 2. 读取当前的键盘状态（KeyState），500ms 黄金窗口蹲守
 	for (; RetryCount > 0; RetryCount--) {
-    	// 注意：部分老主板可能需要调用 ReadKeyStrokeEx 刷新缓冲区，
-    	// 但直接读取控制键状态通常可以通过协议的 KeyState 属性或相关接口
 		Status = TxtInEx->ReadKeyStrokeEx (TxtInEx, &KeyData);
 		if (Status == EFI_SUCCESS || Status == EFI_NOT_READY) {
 			// 3. 判定判定：检测虚拟控制键状态，包括左 Ctrl 或右 Ctrl

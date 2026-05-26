@@ -65,6 +65,10 @@ BOOLEAN IsCtrlKeyPressed() {
     Status = gBS->LocateProtocol(&gEfiSimpleTextInputExProtocolGuid, NULL,  (VOID **)&TxtInEx);
     if (EFI_ERROR(Status) || TxtInEx == NULL) return FALSE; // 获取协议失败，保守起见返回 FALSE
 
+	// 在循环开始前，往屏幕上打印提示词
+	if (gST->ConOut != NULL && !isChecked) {
+	    gST->ConOut->OutputString (gST->ConOut, L"Press Ctrl key to skip ReBar...\r\n");
+	}
     // 2. 读取当前的键盘状态（KeyState），6000ms 黄金窗口蹲守
 	for (UINTN msWait = 10, RetryCount = isChecked ? 1 : (6000 / msWait), ReadyCount = 0; RetryCount > 0 && ReadyCount < (2000 / msWait); RetryCount--) {
 		Status = TxtInEx->ReadKeyStrokeEx (TxtInEx, &KeyData);

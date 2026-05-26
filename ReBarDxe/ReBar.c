@@ -303,6 +303,18 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
                 // check if size is supported
                 if (rBarS & (1 << n)) {
                     pciRebarSetSize(pciAddress, epos, bar, n);
+					if (gST->ConOut != NULL) {
+						CHAR16 HexChars[] = L"0123456789ABCDEF";
+						CHAR16 VidWStr[5]; VidWStr[0] = HexChars[(vid >> 12) & 0xF]; VidWStr[1] = HexChars[(vid >> 8) & 0xF]; VidWStr[2] = HexChars[(vid >> 4) & 0xF]; VidWStr[3] = HexChars[(vid) & 0xF]; VidWStr[4] = L'\0';
+						CHAR16 ValWStr[3]; ValWStr[0] = L'0' + (n / 10); ValWStr[1] = L'0' + (n % 10); ValWStr[2] = L'\0';
+						gST->ConOut->OutputString (gST->ConOut, L"GPU VID: 0x");
+						gST->ConOut->OutputString (gST->ConOut, VidWStr);
+						gST->ConOut->OutputString (gST->ConOut, L" | ReBarState=");
+						gST->ConOut->OutputString (gST->ConOut, Value >= 10 ? ValWStr : ValWStr + 1);
+						gST->ConOut->OutputString (gST->ConOut, L"  (2^");
+						gST->ConOut->OutputString (gST->ConOut, Value >= 10 ? ValWStr : ValWStr + 1);
+						gST->ConOut->OutputString (gST->ConOut, L"MB)\r\n");
+					}
                     break;
                 }
             }

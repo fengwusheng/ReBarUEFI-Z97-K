@@ -53,7 +53,6 @@ BOOLEAN IsCtrlKeyPressed() {
     EFI_STATUS Status;
     EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *TxtInEx = NULL;
     EFI_KEY_DATA KeyData;
-	UINTN RetryCount = isChecked ? 1 : 60;
 
 	// 前置防御：在检测前，强行刷新重置标准输入流
 	// 这一步是尝试踢醒那些还没完全准备好的键盘固件（比如 PS/2 或刚通电的 USB）
@@ -74,8 +73,7 @@ BOOLEAN IsCtrlKeyPressed() {
     }
 
     // 2. 读取当前的键盘状态（KeyState），6000ms 黄金窗口蹲守
-	UINTN ReadyCount = 0;
-	for (; RetryCount > 0 && ReadyCount < 10; RetryCount--) {
+	for (UINTN RetryCount = isChecked ? 1 : 60, ReadyCount = 0; RetryCount > 0 && ReadyCount < 10; RetryCount--) {
 		Status = TxtInEx->ReadKeyStrokeEx (TxtInEx, &KeyData);
 		if (Status == EFI_SUCCESS) ReadyCount++;
 		if (Status == EFI_SUCCESS || Status == EFI_NOT_READY) {

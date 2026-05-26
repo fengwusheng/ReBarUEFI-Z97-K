@@ -29,7 +29,7 @@ SPDX-License-Identifier: MIT
 #define BUILD_YEAR 2023
 
 // a3c5b77a-c88f-4a93-bf1c-4a92a32c65ce
-//static GUID reBarStateGuid = { 0xa3c5b77a, 0xc88f, 0x4a93, {0xbf, 0x1c, 0x4a, 0x92, 0xa3, 0x2c, 0x65, 0xce}};
+static GUID reBarStateGuid = { 0xa3c5b77a, 0xc88f, 0x4a93, {0xbf, 0x1c, 0x4a, 0x92, 0xa3, 0x2c, 0x65, 0xce}};
 
 // 0: disabled
 // >0: maximum BAR size (2^x) set to value. UINT8_MAX for unlimited
@@ -321,28 +321,40 @@ EFI_STATUS EFIAPI rebarInit(
 
 	reBarState = 0;
 
+	CHAR8 StrConfig[] = "ReBar_CFG:Above4GDecodingOffset=0x0001|SetupReBarStateOffset=0xFFFF|EnableUEFIBootMenuDetectReBarState=1|EnableDefaultReBarState=0";
+	UINT32 Above4GOffset   = (UINT32)AsciiStrHexToUintn(&StrConfig[32]);
+	UINT32 SetupStateOffset = (UINT32)AsciiStrHexToUintn(&StrConfig[61]);
+	UINT32 BootMenuDetect   = (UINT32)(StrConfig[103] - '0');
+	UINT32 DefaultState     = (UINT32)(StrConfig[129] - '0');
+
 	// added
-	UINT8 *setupBuffer = NULL;
-	EFI_GUID mSetupGuid = { 0xEC87D643, 0xEBA4, 0x4BB5, { 0xA1, 0xE5, 0x3F, 0x3E, 0x36, 0xB2, 0x0D, 0xA9 } };
-	// 第一步：先试探性读取，拿到 Setup 结构体的总物理大小（公摊面积）
-	bufferSize = 0;
-    status = gRT->GetVariable(L"Setup", &mSetupGuid, NULL, &bufferSize, NULL);
-    if (status == EFI_BUFFER_TOO_SMALL) {
-        // 第二步：动态开辟内存，准备把整个 Setup 结构体打包拉出来
-        gBS->AllocatePool(EfiBootServicesData, bufferSize, (VOID**)&setupBuffer);
-        status = gRT->GetVariable(L"Setup", &mSetupGuid, NULL, &bufferSize, setupBuffer);
-        if (status == EFI_SUCCESS) {
-			reBarState = bufferSize > 16 && setupBuffer[0x01] > 0 ? 10 : reBarState; // ASUS Z97-K R2.0 的 Above 4G Decoding 是 0x1 即使不是，设置 10 即 1GB 问题也不大。
+	if (Above4GOffset < 0xFFFF || SetupStateOffset < 0xFFFF) {
+	    UINT8 *setupBuffer = NULL;
+	    EFI_GUID mSetupGuid = { 0xEC87D643, 0xEBA4, 0x4BB5, { 0xA1, 0xE5, 0x3F, 0x3E, 0x36, 0xB2, 0x0D, 0xA9 } };
+	    // 第一步：先试探性读取，拿到 Setup 结构体的总物理大小（公摊面积）
+	    bufferSize = 0;
+        status = gRT->GetVariable(L"Setup", &mSetupGuid, NULL, &bufferSize, NULL);
+        if (status == EFI_BUFFER_TOO_SMALL) {
+            // 第二步：动态开辟内存，准备把整个 Setup 结构体打包拉出来
+            gBS->AllocatePool(EfiBootServicesData, bufferSize, (VOID**)&setupBuffer);
+            status = gRT->GetVariable(L"Setup", &mSetupGuid, NULL, &bufferSize, setupBuffer);
+            if (status == EFI_SUCCESS && Above4GOffset < 0xFFFF && Above4GOffset < bufferSize) {
+		    	reBarState = setupBuffer[Above4GOffset] > 0 ? 10 : reBarState; // ASUS Z97-K R2.0 的 Above 4G Decoding 是 0x1 即使不是，设置 10 即 1GB 问题也不大。
+            }
+            if (status == EFI_SUCCESS && SetupStateOffset < 0xFFFF && SetupStateOffset < bufferSize) {
+		    	reBarState = setupBuffer[SetupStateOffset];
+            }
+            gBS->FreePool(setupBuffer);
         }
-        gBS->FreePool(setupBuffer);
-    }
+	}
+	BootMenuDetect = reBarState && BootMenuDetect ? 1 : 0; // BootMenuDetect 只有在 4G打开 或 SetupStateOffset 已指定 reBarState 后才检测 UEFI 启动菜单快速修正 reBarState （清CMOS只清4G开关，清菜单应该要拔电池）
 	
 	// added
 	UINT16 bootIndex;
     UINT8 *bootBuffer = NULL;
     CHAR16 bootVarName[] = L"Boot0000";
     // 暴力遍历 Boot0000 到 Boot000F 这 16 个潜在的启动项
-    for (bootIndex = 0; bootIndex <= 0x000F; bootIndex++) {
+    for (bootIndex = 0; BootMenuDetect && bootIndex <= 0x000F; bootIndex++) {
 		bootVarName[7] = (CHAR16)((bootIndex < 10) ? (L'0' + bootIndex) : (L'A' + (bootIndex - 10)));
         bufferSize = 0;
         status = gRT->GetVariable(bootVarName, &gEfiGlobalVariableGuid, NULL, &bufferSize, NULL);
@@ -376,13 +388,12 @@ EFI_STATUS EFIAPI rebarInit(
     //DEBUG((DEBUG_INFO, "ReBarDXE: Loaded\n"));
 
     // Read ReBarState variable
-    //UINT32 attributes;
-    //EFI_TIME time;
-	//bufferSize = 1;
-    //status = gRT->GetVariable(L"ReBarState", &reBarStateGuid,
-    //    &attributes,
-    //    &bufferSize, &reBarState);
-
+    UINT32 attributes;
+    EFI_TIME time;
+	bufferSize = 1;
+    status = !DefaultState ? EFI_BUFFER_TOO_SMALL : gRT->GetVariable(L"ReBarState", &reBarStateGuid,
+        &attributes,
+        &bufferSize, &reBarState);
     // any attempts to overflow reBarState should result in EFI_BUFFER_TOO_SMALL
     //if (status != EFI_SUCCESS)
 	//{
@@ -397,7 +408,6 @@ EFI_STATUS EFIAPI rebarInit(
     //    		// 2. 物理扫描：如果发现主板已经把 PCIe MMIO 资源（非系统主内存）开辟到了 4GB 以上的空间
     //    		if (MemorySpaceMap[i].GcdMemoryType == EfiGcdMemoryTypeMemoryMappedIo &&
     //        		MemorySpaceMap[i].BaseAddress >= 0x100000000ULL) { 
-    //        
     //        		// 3. 证明主板此时硬件上已经绝对支持并开启了大窗口，安全阀直接解锁！
     //        		Above4G_Enabled = 1;
     //        		break;
@@ -407,22 +417,24 @@ EFI_STATUS EFIAPI rebarInit(
 	//	}
 	//	reBarState = !Above4G_Enabled ? 0 : 32; // 后续 reBarSetupDevice 再分流
 	//}
+	if (status == EFI_SUCCESS)
+	{
+        // Detect CMOS reset by checking if year before BUILD_YEAR
+        status = gRT->GetTime (&time, NULL);
+        if (time.Year < BUILD_YEAR) {
+            reBarState = 0;
+            bufferSize = 1;
+            attributes = EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS;
+            status = gRT->SetVariable(L"ReBarState", &reBarStateGuid,
+                attributes,
+                bufferSize, &reBarState);
+            return EFI_SUCCESS;
+        }
+	}
 
     if (reBarState)
     {
         DEBUG((DEBUG_INFO, "ReBarDXE: Enabled, maximum BAR size 2^%u MB\n", reBarState));
-
-        // Detect CMOS reset by checking if year before BUILD_YEAR
-        //status = gRT->GetTime (&time, NULL);
-        //if (time.Year < BUILD_YEAR) {
-        //    reBarState = 0;
-        //    bufferSize = 1;
-        //    attributes = EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS;
-        //    status = gRT->SetVariable(L"ReBarState", &reBarStateGuid,
-        //        attributes,
-        //        bufferSize, &reBarState);
-        //    return EFI_SUCCESS;
-        //}
 
         // For overriding PciHostBridgeResourceAllocationProtocol
         pciHostBridgeResourceAllocationProtocolHook();

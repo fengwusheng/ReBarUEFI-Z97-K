@@ -66,7 +66,7 @@ BOOLEAN IsCtrlKeyPressed() {
     if (EFI_ERROR(Status) || TxtInEx == NULL) return FALSE; // 获取协议失败，保守起见返回 FALSE
 
     // 2. 读取当前的键盘状态（KeyState），6000ms 黄金窗口蹲守
-	for (UINTN msWait = 5, RetryCount = isChecked ? 1 : (6000 / msWait), ReadyCount = 0; RetryCount > 0 && ReadyCount < (2000 / msWait); RetryCount--) {
+	for (UINTN msWait = 10, RetryCount = isChecked ? 1 : (6000 / msWait), ReadyCount = 0; RetryCount > 0 && ReadyCount < (2000 / msWait); RetryCount--) {
 		Status = TxtInEx->ReadKeyStrokeEx (TxtInEx, &KeyData);
 		if (Status == EFI_SUCCESS) ReadyCount++;
 		if (Status == EFI_SUCCESS || Status == EFI_NOT_READY) {
@@ -78,7 +78,7 @@ BOOLEAN IsCtrlKeyPressed() {
                 }
             }
 		}
-		gBS->Stall (msWait * 1000); // 每次等 5 毫秒
+		gBS->Stall (msWait * 1000); // 每次循环稍微等待
 	}
 
 	isChecked = TRUE;

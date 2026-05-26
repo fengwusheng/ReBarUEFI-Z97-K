@@ -213,11 +213,11 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
         // NVIDIA (V100): 可以给 32，满足它全映射死命令
         //actualReBarState = reBarState >= 32 ? 32 : reBarState;
 		// N卡计算卡开始不开都没问题，后面 TCC 大量内存去申请也可以用
-        actualReBarState = reBarState >= 32 ? 32 : reBarState >= 12 ? reBarState : 0; // 默认 4G 开关给的 10 会变成 0
+        actualReBarState = reBarState >= 32 ? 32 : reBarState >= 12 ? reBarState : 0; // 默认 4G 开关给的 9 会变成 0
     } else if (vid == 0x1002) {
-        // AMD (6600XT): 主动让路，只给 1GB (10) 或者是 512MB (9)，不撑爆主板
+        // AMD (6600XT): 只给 1GB (10) 或者是 512MB (9)，不撑爆主板
         //actualReBarState = reBarState >= 10 ? 10 : reBarState; 
-		// 其实报错声音一长三短叫完后黑屏等待还是能进系统的（11即2GB很特殊，BIOS以为能低位能分配就不叫了，但结果花屏）
+		// 其实报错声音一长三短叫完后黑屏等待还是能进系统的（2GB即11很特殊，BIOS以为能低位能分配就不叫了，但结果花屏）
 		actualReBarState = reBarState >= 32 ? 32 : reBarState;
     } else {
 		// 其他不允许ReBar
@@ -341,7 +341,7 @@ EFI_STATUS EFIAPI rebarInit(
             gBS->AllocatePool(EfiBootServicesData, bufferSize, (VOID**)&setupBuffer);
             status = gRT->GetVariable(L"Setup", &mSetupGuid, NULL, &bufferSize, setupBuffer);
             if (status == EFI_SUCCESS && Above4GOffset < 0xFFFF && Above4GOffset < bufferSize) {
-		    	reBarState = setupBuffer[Above4GOffset] > 0 ? 10 : reBarState; // ASUS Z97-K R2.0 的 Above 4G Decoding 是 0x1 即使不是，设置 10 即 1GB 问题也不大。
+		    	reBarState = setupBuffer[Above4GOffset] > 0 ? 9 : reBarState; // ASUS Z97-K R2.0 的 Above 4G Decoding 是 0x1 即使不是，设置 9 即 512MB 问题也不大，双卡两个 512MB 也是很轻松
             }
             if (status == EFI_SUCCESS && SetupStateOffset < 0xFFFF && SetupStateOffset < bufferSize) {
 		    	reBarState = setupBuffer[SetupStateOffset];
@@ -418,7 +418,7 @@ EFI_STATUS EFIAPI rebarInit(
     //		}
     //		gBS->FreePool(MemorySpaceMap);
 	//	}
-	//	reBarState = !Above4G_Enabled ? 0 : 10; // 后续 reBarSetupDevice 再分流
+	//	reBarState = !Above4G_Enabled ? 0 : 9; // 后续 reBarSetupDevice 再分流
 	//}
 	if (status == EFI_SUCCESS)
 	{

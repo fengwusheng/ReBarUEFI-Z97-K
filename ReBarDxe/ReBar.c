@@ -44,11 +44,25 @@ static EFI_PCI_HOST_BRIDGE_RESOURCE_ALLOCATION_PROTOCOL_PREPROCESS_CONTROLLER o_
 
 // 检测 Ctrl 键是否被按下
 BOOLEAN IsCtrlKeyPressed() {
+	// 遵从 EDK2 规范：不赋初始值，默认就是 FALSE/零值
+	static BOOLEAN isChecked;// = FALSE; 
+	static BOOLEAN isPressed;// = FALSE;
+
+	if (isPressed) return TRUE;
+	
     EFI_STATUS Status;
     EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *TxtInEx = NULL;
     EFI_KEY_STATE KeyState;
+	UINTN RetryCount = isChecked ? 1 : 50;
 
-    // 1. 通过 BootServices 获取系统的扩展输入协议
+	// 前置防御：在检测前，强行刷新重置标准输入流
+	// 这一步是尝试踢醒那些还没完全准备好的键盘固件（比如 PS/2 或刚通电的 USB）
+	if (gST->ConIn != NULL) {
+		gST->ConIn->Reset (gST->ConIn, FALSE);
+		gBS->Stall (100000); // 挂起 100,000 微秒（也就是 100 毫秒），给 USB 硬件一点反应时间
+	}
+	
+	// 1. 通过 BootServices 获取系统的扩展输入协议
     Status = gBS->LocateProtocol(
         &gEfiSimpleTextInputExProtocolGuid, 
         NULL, 
@@ -60,20 +74,25 @@ BOOLEAN IsCtrlKeyPressed() {
     }
 
     // 2. 读取当前的键盘状态（KeyState）
-    // 注意：部分老主板可能需要调用 ReadKeyStrokeEx 刷新缓冲区，
-    // 但直接读取控制键状态通常可以通过协议的 KeyState 属性或相关接口
-    Status = TxtInEx->GetState(TxtInEx, &KeyState);
-    if (EFI_ERROR(Status)) {
-        return FALSE;
-    }
+	// 500ms 黄金窗口蹲守
+	for (; RetryCount > 0; RetryCount--) {
+    	// 注意：部分老主板可能需要调用 ReadKeyStrokeEx 刷新缓冲区，
+    	// 但直接读取控制键状态通常可以通过协议的 KeyState 属性或相关接口
+		Status = TxtInEx->GetState (TxtInEx, &KeyState);
+		if (!EFI_ERROR (Status)) {
+			// 3. 判定判定：检测虚拟控制键状态
+			// EFI_CTRL_PRESSED_VALUE 包括左 Ctrl 或右 Ctrl
+			if ((KeyState.KeyShiftState & EFI_CTRL_PRESSED_VALUE) != 0) {
+				// 抓到了！写入 static 缓存
+				isPressed = TRUE; 
+				break;
+			}
+		}
+		gBS->Stall (10000); // 每次死等 10 毫秒
+	}
 
-    // 3. 判定判定：检测虚拟控制键状态
-    // EFI_CTRL_PRESSED_VALUE 包括左 Ctrl 或右 Ctrl
-    if ((KeyState.KeyShiftState & EFI_CTRL_PRESSED_VALUE) != 0) {
-        return TRUE; // Ctrl 确实被按着！
-    }
-
-    return FALSE;
+	isChecked = TRUE;
+    return isPressed;
 }
 
 // 帮我们在宽字符里找子串的辅助函数

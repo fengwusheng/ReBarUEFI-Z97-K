@@ -23,6 +23,7 @@
 [Protocols]
   gEfiPciRootBridgeIoProtocolGuid ## SOMETIMES_CONSUMES
   gEfiPciHostBridgeResourceAllocationProtocolGuid ## SOMETIMES_CONSUMES
+  gEfiSimpleTextInputExProtocolGuid
 
 [Depex]
   gEfiPciRootBridgeIoProtocolGuid

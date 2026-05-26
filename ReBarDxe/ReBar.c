@@ -78,15 +78,15 @@ BOOLEAN IsCtrlKeyPressed() {
 	for (; RetryCount > 0; RetryCount--) {
     	// 注意：部分老主板可能需要调用 ReadKeyStrokeEx 刷新缓冲区，
     	// 但直接读取控制键状态通常可以通过协议的 KeyState 属性或相关接口
-		Status = TxtInEx->GetState (TxtInEx, &KeyState);
-		if (!EFI_ERROR (Status)) {
-			// 3. 判定判定：检测虚拟控制键状态
-			// EFI_CTRL_PRESSED_VALUE 包括左 Ctrl 或右 Ctrl
-			if ((KeyState.KeyShiftState & EFI_CTRL_PRESSED_VALUE) != 0) {
-				// 抓到了！写入 static 缓存
-				isPressed = TRUE; 
-				break;
-			}
+		Status = TxtInEx->ReadKeyStrokeEx (TxtInEx, &KeyData);
+		if (Status == EFI_SUCCESS || Status == EFI_NOT_READY) {
+			// 3. 判定判定：检测虚拟控制键状态，包括左 Ctrl 或右 Ctrl
+			if ((KeyData.KeyState.KeyShiftState & 0x80000000) != 0) { // EFI_SHIFT_STATE_VALID 0x80000000
+                if ((KeyData.KeyState.KeyShiftState & (0x00000001 | 0x00000002)) != 0) { // EFI_LEFT_CONTROL_PRESSED 0x00000001   EFI_RIGHT_CONTROL_PRESSED 0x00000002
+                    isPressed = TRUE; 
+                    break;
+                }
+            }
 		}
 		gBS->Stall (10000); // 每次死等 10 毫秒
 	}

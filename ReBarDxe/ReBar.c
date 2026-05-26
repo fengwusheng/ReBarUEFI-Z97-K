@@ -87,7 +87,7 @@ BOOLEAN IsCtrlKeyPressed() {
                 }
             }
 		}
-		gBS->Stall (100000); // 每次死等 100 毫秒
+		if (RetryCount > 1) gBS->Stall (100000); // 每次等 100 毫秒（最后一次不用等）
 	}
 
 	isChecked = TRUE;

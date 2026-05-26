@@ -265,11 +265,10 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
     pciReadConfigWord(pciAddress, 0, &vid);
     pciReadConfigWord(pciAddress, 2, &did);
 
-    if (vid == 0xFFFF)
-        return;
+    if (vid == 0xFFFF) return;
 
-	// added
-	if (IsCtrlKeyPressed()) return;
+    // added
+    if (IsCtrlKeyPressed()) return;
 
     DEBUG((DEBUG_INFO, "ReBarDXE: Device vid:%x did:%x\n", vid, did));
 

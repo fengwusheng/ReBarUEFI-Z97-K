@@ -69,7 +69,7 @@ BOOLEAN IsCtrlKeyPressed() {
 	// 在循环开始前，往屏幕上打印提示词
 	//if (gST->ConOut != NULL && !isChecked) gST->ConOut->OutputString (gST->ConOut, L"Press Ctrl key to skip ReBar ...\r\n");
     // 2. 读取当前的键盘状态（KeyState），6000ms 黄金窗口蹲守
-	for (UINTN msWait = 10, RetryCount = isChecked ? 1 : (6000 / msWait), ReadyCount = 0; RetryCount > 0 && ReadyCount < (2000 / msWait); RetryCount--) {
+	for (UINTN msWait = 10, RetryCount = isChecked ? 1 : (6000 / msWait), ReadyCount = 0; RetryCount > 0 && ReadyCount < (1200 / msWait); RetryCount--) {
 		Status = TxtInEx->ReadKeyStrokeEx (TxtInEx, &KeyData);
 		if (Status == EFI_SUCCESS) ReadyCount++;
 		if (Status == EFI_SUCCESS || Status == EFI_NOT_READY) {

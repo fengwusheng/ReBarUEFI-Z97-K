@@ -35,7 +35,7 @@ static GUID reBarStateGuid = { 0xa3c5b77a, 0xc88f, 0x4a93, {0xbf, 0x1c, 0x4a, 0x
 // 0: disabled
 // >0: maximum BAR size (2^x) set to value. UINT8_MAX for unlimited
 static UINT8 reBarState = 0;
-static CHAR16 OnlyFor = L'*'; // Get value from UEFI Boot Menu
+static CHAR16 OnlyFor = L'*'; // Get value from UEFI Boot Menu OnlyFor=N or OnlyFor=A
 
 static EFI_PCI_HOST_BRIDGE_RESOURCE_ALLOCATION_PROTOCOL *pciResAlloc;
 static EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL *pciRootBridgeIo;
@@ -276,12 +276,12 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
         // NVIDIA (V100): 可以给 32，满足它全映射死命令
         //actualReBarState = reBarState >= 32 ? 32 : reBarState;
 		// N卡计算卡开始不开都没问题，后面 TCC 大量内存去申请也可以用
-        actualReBarState = OnlyFor == L'A' ? 0 : reBarState >= 32 ? 32 : reBarState >= 12 ? reBarState : 0; // 默认 4G 开关给的 9 会变成 0
+        actualReBarState = OnlyFor != L'*' && OnlyFor != L'N' ? 0 : reBarState >= 32 ? 32 : reBarState >= 12 ? reBarState : 0; // 默认 4G 开关给的 9 会变成 0
     } else if (vid == 0x1002) {
         // AMD (6600XT): 只给 1GB (10) 或者是 512MB (9)，不撑爆主板
         //actualReBarState = reBarState >= 10 ? 10 : reBarState; 
 		// 其实报错声音一长三短叫完后黑屏等待还是能进系统的（2GB即11很特殊，BIOS以为能低位能分配就不叫了，但结果花屏）
-		actualReBarState = OnlyFor == L'N' ? 0 : reBarState >= 32 ? 32 : reBarState;
+		actualReBarState = OnlyFor != L'*' && OnlyFor != L'A' ? 0 : reBarState >= 32 ? 32 : reBarState;
     } else {
 		// 其他不允许ReBar
         actualReBarState = 0;

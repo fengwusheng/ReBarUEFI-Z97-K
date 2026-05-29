@@ -262,10 +262,8 @@ VOID reBarSetupDevice(EFI_HANDLE handle, EFI_PCI_ROOT_BRIDGE_IO_PROTOCOL_PCI_ADD
     pciReadConfigWord(pciAddress, 0, &vid);
     pciReadConfigWord(pciAddress, 2, &did);
 
-    if (vid == 0xFFFF) return;
-
-    // added
-    if (IsCtrlKeyPressed()) return;
+    if (vid == 0xFFFF)
+		return;
 
     DEBUG((DEBUG_INFO, "ReBarDXE: Device vid:%x did:%x\n", vid, did));
 
@@ -376,13 +374,13 @@ EFI_STATUS EFIAPI rebarInit(
 
 	// added
 	reBarState = 0;
-	if (IsCtrlKeyPressed()) return EFI_SUCCESS;
 
-	CHAR8 StrConfig[] = "ReBar_CFG:Above4GDecodingOffset=0x0001|SetupReBarStateOffset=0xFFFF|EnableUEFIBootMenuDetectReBarState=1|EnableDefaultReBarState=0";
+	CHAR8 StrConfig[] = "ReBar_CFG:Above4GDecodingOffset=0x0001|SetupReBarStateOffset=0xFFFF|EnableUEFIBootMenuDetectReBarState=1|EnableDefaultReBarState=0|EnableCtrlKeyDetect=0";
 	UINT32 Above4GOffset   = (UINT32)AsciiStrHexToUintn(&StrConfig[32]);
 	UINT32 SetupStateOffset = (UINT32)AsciiStrHexToUintn(&StrConfig[61]);
 	UINT32 BootMenuDetect   = (UINT32)(StrConfig[103] - '0');
 	UINT32 DefaultState     = (UINT32)(StrConfig[129] - '0');
+	UINT32 CtrlKeyDetect     = (UINT32)(StrConfig[151] - '0');
 
 	// added
 	if (Above4GOffset < 0xFFFF || SetupStateOffset < 0xFFFF) {
@@ -436,6 +434,8 @@ EFI_STATUS EFIAPI rebarInit(
                         DEBUG((DEBUG_INFO, "ReBarDXE: Hijacked from %s! Found ReBarState=%u\n", bootVarName, reBarState));
 						match = StrStr16(description, L"OnlyFor=");
 						if (match != NULL) OnlyFor = match[8];
+						match = StrStr16(description, L"CtrlKeyDetect=");
+						if (match != NULL) CtrlKeyDetect = (UINT32)(match[14] - L'0');
                         gBS->FreePool(bootBuffer);
                         break; // 找到了就立刻收工，以此项为准！
                     }
@@ -445,7 +445,13 @@ EFI_STATUS EFIAPI rebarInit(
         }
     }
 	
-    //DEBUG((DEBUG_INFO, "ReBarDXE: Loaded\n"));
+	if (CtrlKeyDetect && IsCtrlKeyPressed()) {
+		reBarState = 0;
+		return EFI_SUCCESS;
+	}
+
+	
+	//DEBUG((DEBUG_INFO, "ReBarDXE: Loaded\n"));
 
     // Read ReBarState variable
     UINT32 attributes;
